@@ -1,15 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" readonly="true" id="a2b18b82-2002-45a7-9cfb-c0cc55290967" name="Default" comment="">
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/trace_detail.png" afterPath="$PROJECT_DIR$/trace_detail.png" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/.idea/workspace.xml" afterPath="$PROJECT_DIR$/.idea/workspace.xml" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/Function/other_func.py" afterPath="$PROJECT_DIR$/Function/other_func.py" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/Global_Info.py" afterPath="$PROJECT_DIR$/Global_Info.py" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/Performance/perform.py" afterPath="$PROJECT_DIR$/Performance/perform.py" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/backtest.py" afterPath="$PROJECT_DIR$/backtest.py" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/test.py" afterPath="$PROJECT_DIR$/test.py" />
-    </list>
+    <list default="true" readonly="true" id="a2b18b82-2002-45a7-9cfb-c0cc55290967" name="Default" comment="" />
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="TRACKING_ENABLED" value="true" />
     <option name="SHOW_DIALOG" value="false" />
@@ -23,11 +15,11 @@
   </component>
   <component name="FileEditorManager">
     <leaf SIDE_TABS_SIZE_LIMIT_KEY="300">
-      <file leaf-file-name="backtest.py" pinned="false" current-in-tab="false">
+      <file leaf-file-name="backtest.py" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/backtest.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="676">
-              <caret line="137" column="8" lean-forward="true" selection-start-line="137" selection-start-column="8" selection-end-line="137" selection-end-column="35" />
+            <state relative-caret-position="636">
+              <caret line="206" column="9" lean-forward="false" selection-start-line="206" selection-start-column="9" selection-end-line="206" selection-end-column="9" />
               <folding>
                 <element signature="e#122#153#0" expanded="true" />
               </folding>
@@ -45,7 +37,7 @@
           </provider>
         </entry>
       </file>
-      <file leaf-file-name="perform.py" pinned="false" current-in-tab="true">
+      <file leaf-file-name="perform.py" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/Performance/perform.py">
           <provider selected="true" editor-type-id="text-editor">
             <state relative-caret-position="280">
@@ -68,7 +60,7 @@
       <file leaf-file-name="other_func.py" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/Function/other_func.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="-15">
+            <state relative-caret-position="4704">
               <caret line="169" column="21" lean-forward="false" selection-start-line="169" selection-start-column="21" selection-end-line="169" selection-end-column="21" />
               <folding />
             </state>
@@ -142,9 +134,9 @@
         <option value="$PROJECT_DIR$/test.py" />
         <option value="$PROJECT_DIR$/resample_indexweight.py" />
         <option value="$PROJECT_DIR$/Global_Info.py" />
-        <option value="$PROJECT_DIR$/backtest.py" />
         <option value="$PROJECT_DIR$/Function/other_func.py" />
         <option value="$PROJECT_DIR$/Performance/perform.py" />
+        <option value="$PROJECT_DIR$/backtest.py" />
       </list>
     </option>
   </component>
@@ -185,7 +177,6 @@
       <foldersAlwaysOnTop value="true" />
     </navigator>
     <panes>
-      <pane id="Scratches" />
       <pane id="ProjectPane">
         <subPane>
           <PATH>
@@ -201,6 +192,7 @@
         </subPane>
       </pane>
       <pane id="Scope" />
+      <pane id="Scratches" />
     </panes>
   </component>
   <component name="PropertiesComponent">
@@ -428,24 +420,6 @@
     <configuration>C:\Users\gaofl\AppData\Roaming\Subversion</configuration>
     <supportedVersion>125</supportedVersion>
   </component>
-  <component name="SvnFileUrlMappingImpl">
-    <option name="myMappingRoots">
-      <list>
-        <SvnCopyRootSimple>
-          <option name="myVcsRoot" value="C:\Users\gaofl\Desktop\GDP\PJ" />
-          <option name="myCopyRoot" value="C:\Users\gaofl\Desktop\GDP\PJ" />
-        </SvnCopyRootSimple>
-      </list>
-    </option>
-    <option name="myMoreRealMappingRoots">
-      <list>
-        <SvnCopyRootSimple>
-          <option name="myVcsRoot" value="C:\Users\gaofl\Desktop\GDP\PJ" />
-          <option name="myCopyRoot" value="C:\Users\gaofl\Desktop\GDP\PJ" />
-        </SvnCopyRootSimple>
-      </list>
-    </option>
-  </component>
   <component name="TaskManager">
     <task active="true" id="Default" summary="Default task">
       <changelist id="a2b18b82-2002-45a7-9cfb-c0cc55290967" name="Default" comment="" />
@@ -467,8 +441,9 @@
   </component>
   <component name="ToolWindowManager">
     <frame x="-11" y="-11" width="1942" height="1042" extended-state="6" />
+    <editor active="true" />
     <layout>
-      <window_info id="Project" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.1546875" sideWeight="0.493266" order="0" side_tool="false" content_ui="combo" />
+      <window_info id="Project" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.14114584" sideWeight="0.493266" order="0" side_tool="false" content_ui="combo" />
       <window_info id="TODO" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.32828283" sideWeight="0.5" order="7" side_tool="false" content_ui="tabs" />
       <window_info id="Event Log" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.3846154" sideWeight="0.5030257" order="8" side_tool="true" content_ui="tabs" />
       <window_info id="Run" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.104513064" sideWeight="0.4969743" order="2" side_tool="false" content_ui="tabs" />
@@ -647,16 +622,6 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/backtest.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="676">
-          <caret line="137" column="8" lean-forward="true" selection-start-line="137" selection-start-column="8" selection-end-line="137" selection-end-column="35" />
-          <folding>
-            <element signature="e#122#153#0" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/Global_Info.py">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="588">
@@ -675,7 +640,7 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/Function/other_func.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="-15">
+        <state relative-caret-position="4704">
           <caret line="169" column="21" lean-forward="false" selection-start-line="169" selection-start-column="21" selection-end-line="169" selection-end-column="21" />
           <folding />
         </state>
@@ -686,6 +651,16 @@
         <state relative-caret-position="280">
           <caret line="38" column="58" lean-forward="false" selection-start-line="38" selection-start-column="58" selection-end-line="38" selection-end-column="58" />
           <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/backtest.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="636">
+          <caret line="206" column="9" lean-forward="false" selection-start-line="206" selection-start-column="9" selection-end-line="206" selection-end-column="9" />
+          <folding>
+            <element signature="e#122#153#0" expanded="true" />
+          </folding>
         </state>
       </provider>
     </entry>
