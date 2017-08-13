@@ -190,7 +190,7 @@ if __name__ == "__main__":
     # print(backtest.daily_return)
     print(backtest.portfolio)
     print(backtest.cost)
-    print(backtest.tradedetail)
+    print(backtest.trade_detail)
     # import pickle
     # pickle.dump(backtest.trade_status,open("trade_status","wb"))
     # pickle.dump(backtest.factor_data, open("factor_data", "wb"))

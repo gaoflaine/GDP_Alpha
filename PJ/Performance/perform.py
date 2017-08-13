@@ -40,6 +40,7 @@ def get_cost(all_tradedate_position):
         difference = union[union.weight != union.weight_yesterday].fillna(0)
         difference.loc[:, 'direction'] = (difference.weight > difference.weight_yesterday)
         difference.loc[:, 'delta_weight'] = abs(difference.loc[:, 'weight'] - difference.loc[:, 'weight_yesterday'])
+        difference.loc[:, 'time'] = name
         trade_detail = trade_detail.append(difference.loc[:, ['time', 'stkcd', 'delta_weight', 'direction']])
         if len(difference) == 0:
             cost.loc[j, 'time'] = name
