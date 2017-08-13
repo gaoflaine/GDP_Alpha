@@ -135,7 +135,7 @@ class BackTest:
         # 根据调仓日的实际持仓表，展期到全部的相关交易日，确定为当日的持仓
         # 处理了涨跌停、停牌
         # 返回当日的实际持仓表、每日的交易成本和股票的具体买卖时点
-        self.all_tradedate_position, self.cost = other_func.position_extension(self.CPD_position,
+        self.all_tradedate_position = other_func.position_extension(self.CPD_position,
                                                                                self.all_trading_data,
                                                                                self.all_tradingday,
                                                                                self.change_position_day,
@@ -145,6 +145,7 @@ class BackTest:
 
     # 输入全部交易日的实际持仓表（考虑涨跌停等限制后），返回策略的净值表现
     def get_portfolio(self):
+        self.trade_detail, self.cost = perform.get_cost(self.all_tradedate_position)
         self.portfolio = perform.get_portfolio(self.all_tradedate_position,
                                                                          self.all_trading_data,
                                                                          self.benchmark, self.hedgemethod, self.margin)
@@ -158,8 +159,8 @@ class BackTest:
 
 if __name__ == "__main__":
     para_dict = {
-        "path": 'D:\strategy\GDP\GD.db',
-        # "path": 'F:\project_gdp\GD.db',
+        # "path": 'D:\strategy\GDP\GD.db',
+         "path": 'F:\project_gdp\GD.db',
         "factor": ["pb"],
         # "weightType": 3,
         "n": 10,
@@ -169,7 +170,7 @@ if __name__ == "__main__":
         # "weightType": 0,
         # "factor_weight": [0.5, -0.5],
         "start": "2010-01-01",
-        "end": "2012-01-01",
+        "end": "2013-01-01",
         "positionType": 1,
         "backperiod": 20,
         "hedgemethod": 1
@@ -187,8 +188,9 @@ if __name__ == "__main__":
     # backtest.CPD_position.to_csv("CPD_position.csv")
     # backtest.all_tradedate_position.to_csv("all_tradedate_position.csv")
     # print(backtest.daily_return)
-    print(backtest.cost)
     print(backtest.portfolio)
+    print(backtest.cost)
+    print(backtest.tradedetail)
     # import pickle
     # pickle.dump(backtest.trade_status,open("trade_status","wb"))
     # pickle.dump(backtest.factor_data, open("factor_data", "wb"))
@@ -202,9 +204,3 @@ if __name__ == "__main__":
     # pickle.dump(backtest.final_position, open("final_position", "wb"))
     # pickle.dump(backtest.daily_return, open("daily_return", "wb"))
     # pickle.dump(backtest.portfolio, open("portfolio", "wb"))
-
-
-    # 你
-
-
-    # 我

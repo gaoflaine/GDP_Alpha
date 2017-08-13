@@ -30,34 +30,27 @@ import numpy as np
 
 def get_cost(all_tradedate_position):
     j = 0
-    trade_detail = pd.merge(columns=['time', 'stkcd', 'delta_weight', 'direction'])
+    trade_detail = pd.DataFrame(columns=['time', 'stkcd', 'delta_weight', 'direction'])
     yesterday_position = pd.DataFrame(columns=['time', 'stkcd', 'weight'])
+    cost = pd.DataFrame()
     for name, group in all_tradedate_position.groupby("time"):
         today_position = group.copy()
         union = pd.merge(today_position, yesterday_position, how='outer', on='stkcd',
                          suffixes=['', '_yesterday'])
         difference = union[union.weight != union.weight_yesterday].fillna(0)
         difference.loc[:, 'direction'] = (difference.weight > difference.weight_yesterday)
-        difference.loc[:, 'delta_weight'] = abs(difference.weight - difference.weight_yesterday)
-        trade_detail = difference.loc[:, ['time', 'stkcd', 'delta_weight', 'direction']]
-
+        difference.loc[:, 'delta_weight'] = abs(difference.loc[:, 'weight'] - difference.loc[:, 'weight_yesterday'])
+        trade_detail = trade_detail.append(difference.loc[:, ['time', 'stkcd', 'delta_weight', 'direction']])
         if len(difference) == 0:
             cost.loc[j, 'time'] = name
             cost.loc[j, 'cost'] = 0
         else:
             cost.loc[j, 'time'] = name
-            cost.loc[j, 'cost'] = abs(difference.weight - difference.weight_yesterday).sum()
+            cost.loc[j, 'cost'] = abs(difference.loc[:, 'weight'] - difference.loc[:, 'weight_yesterday']).sum()
         j += 1
-        # 每天的最后计算交易成本
-        # X = pd.merge(today_position, yesterday_position, how='outer', on=['stkcd'])
-        # Y = X[X.weight_x != X.weight_y].fillna(0)
-        # if len(Y) == 0:
-        #     cost.loc[j, 'time'] = today
-        #     cost.loc[j, 'cost'] = 0
-        # else:
-        #     cost.loc[j, 'time'] = today
-        #     cost.loc[j, 'cost'] = abs(Y.weight_x - Y.weight_y).sum()
-        # j += 1
+        yesterday_position = today_position.copy()
+    return trade_detail, cost
+
 
 
 def get_portfolio(all_tradedate_position, all_trading_data, benchmark, hedgemethod, margin):
