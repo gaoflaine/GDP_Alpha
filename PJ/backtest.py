@@ -145,6 +145,7 @@ class BackTest:
 
     # 输入全部交易日的实际持仓表（考虑涨跌停等限制后），返回策略的净值表现
     def get_portfolio(self):
+        # 计算具体买卖股票的时间点和交易成本
         self.trade_detail, self.cost = perform.get_cost(self.all_tradedate_position)
         self.portfolio = perform.get_portfolio(self.all_tradedate_position,
                                                                          self.all_trading_data,
@@ -171,7 +172,7 @@ if __name__ == "__main__":
         # "factor_weight": [0.5, -0.5],
         "start": "2010-01-01",
         "end": "2013-01-01",
-        "positionType": 1,
+        "positionType": 2,
         "backperiod": 20,
         "hedgemethod": 1
     }

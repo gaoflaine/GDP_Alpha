@@ -166,23 +166,36 @@ def position_extension(CPD_position, all_trading_data,
                 # 换仓日，仓位保持与上个月一样
                 today_position = yesterday_position.copy()
                 today_position['time'] = today
-                # tosell = today_position[-today_position.stkcd.isin(group.stkcd)][['stkcd', 'score', 'weight']]
-                # toselllist = list(tosell.stkcd)
-                # tobuy = group[-group.isin(today_position.stkcd)][['stkcd', 'score', 'weight']]
-                # tobuylist = list(tobuy.stkcd)
+                # 并记录上个月的position
+                last_month_position = today_position.copy()
             elif yesterday == name:
                 # 换仓日第二天
-                # 仅从上个月的position和这个月的position的差异得出的selling和buying
-                selling = yesterday_position[-yesterday_position.stkcd.isin(group.stkcd)]
-                buying = group[-group.stkcd.isin(yesterday_position.stkcd)]
+                # 先确定准备买入和卖出的股票，selling和buying
+                # selling包括两部分，一部分是上个月持有的，这月要全部卖完的，另一部分是上个月持有的，但是要减仓的
+                # buying包括两部分，一部分是上个月没有的，这个月要买入的，另一部分是上个月持有的，但是要加仓的
 
-                if len(buying) == 0:
+                # selling和buying的第一部分
+                selling = last_month_position[-last_month_position.stkcd.isin(group.stkcd)]
+                buying = group[-group.stkcd.isin(last_month_position.stkcd)]
+
+                # selling和buying的第二部分，算法是merge上个月和这个月的持仓，根据weight变化方向记录下这部分股票，记为pluslist和minuslist
+                adjust_weight = pd.merge(group, last_month_position, on=['time', 'stkcd'], suffixes=['', '_yesterday'])
+                adjust_weight['weight'] = adjust_weight['weight'] - adjust_weight['weight_yesterday']
+                pluslist = list(adjust_weight.query("weight > 0").stkcd)
+                minuslist = list(adjust_weight.query("weight < 0").stkcd)
+
+                # 把这第二部分加到selling和buying里
+                buying = buying.append(adjust_weight.query("weight > 0").loc[:, ['time', 'stkcd', 'score', 'weight']])
+                selling = selling.append(adjust_weight.query("weight < 0").loc[:, ['time', 'stkcd', 'score', 'weight']])
+                selling['weight'] = abs(selling['weight'])  # weight统一为正
+
+                if len(buying) == 0 :
                     # 若buying为空，直接填充到月底或季度底
                     today_position = group.copy()
                     for i in period[period.index(today):]:
                         today_position['time'] = i
                         final_result = final_result.append(today_position)
-                        yesterday_position = today_position.copy()
+                        last_month_position = today_position.copy()
                     break
                 # 查找buying和selling的交易状态
                 selling = pd.merge(selling, status_limit, on=['time', 'stkcd'])
@@ -198,20 +211,32 @@ def position_extension(CPD_position, all_trading_data,
                     sort_values('score', ascending=False)
 
                 # 算出仓位不够买入的股票
-                no_space_tobuy = buy_available[buy_available.weight.cumsum() +
-                                               group[-group.stkcd.isin(buying.stkcd)].weight.sum() + weight_tosell > 1]
+                no_space_tobuy = buy_available[buy_available.weight.cumsum()
+                                               + group[group.stkcd.isin(last_month_position.stkcd)].weight.sum()
+                                               + weight_tosell > 1]
 
                 # 待买的，两部分，一部分是不可交易的，另一部分是仓位不够买入的
                 tobuylist = list(buying[(buying.status != 'Trading') | (buying.LimitUD == 1)].stkcd)
                 tobuylist.extend(list(no_space_tobuy.stkcd))
                 tobuy = buying[buying.stkcd.isin(tobuylist)][['stkcd', 'score', 'weight']]
 
-                # 保留待卖的，删去待买的
-                tosell_today = tosell.copy()
-                tosell_today['time'] = today
+                # 算今天的实际仓位，即保留待卖的，删去待买的
+                # 第一步，删去tobuylist的股票，但是可能会把加仓的股票也删掉
                 today_position = group[-group.stkcd.isin(tobuylist)]
+                if tobuy.stkcd.isin(pluslist).any():
+                    # 如果tobuylist有加仓的股票，则要在上个月的持仓中找到该股票以及权重，添加进来
+                    today_position = today_position.append(last_month_position[last_month_position.stkcd.isin(tobuylist)])
+
+                # 第二步，添加tosellist的股票，但是可能会把减仓的股票也添加进来，导致有两行股票代码一样
+                if tosell.stkcd.isin(minuslist).any():
+                    # 如果toselllist有减仓的股票，则要先把该股票扣除，以避免重复
+                    today_position = today_position[-today_position.stkcd.isin(last_month_position.stkcd)]
+                today_position = today_position.append(last_month_position[last_month_position.stkcd.isin(toselllist)])
+
+                # 统一日期和顺序
                 today_position['time'] = today
-                today_position = today_position.append(tosell_today)
+                today_position = today_position.sort_values("stkcd")
+
             else:
                 # 普通交易日
                 if len(tobuylist) == 0:
@@ -248,18 +273,30 @@ def position_extension(CPD_position, all_trading_data,
                             tobuylist = list(buying[(buying.status != 'Trading') | (buying.LimitUD == 1)].stkcd)
                             tobuylist.extend(list(no_space_tobuy.stkcd))
                             tobuy = buying[buying.stkcd.isin(tobuylist)][['stkcd', 'score', 'weight']]
-                tosell_today = tosell.copy()
-                tosell_today['time'] = today
+
+
+                # 算今天的实际仓位，即保留待卖的，删去待买的
+                # 第一步，删去tobuylist的股票，但是可能会把加仓的股票也删掉
                 today_position = group[-group.stkcd.isin(tobuylist)]
+                if tobuy.stkcd.isin(pluslist).any():
+                    # 如果tobuylist有加仓的股票，则要在上个月的持仓中找到该股票以及权重，添加进来
+                    today_position = today_position.append(last_month_position[last_month_position.stkcd.isin(tobuylist)])
+
+                # 第二步，添加tosellist的股票，但是可能会把减仓的股票也添加进来，导致有两行股票代码一样
+                if tosell.stkcd.isin(minuslist).any():
+                    # 如果toselllist有减仓的股票，则要先把该股票扣除，以避免重复
+                    today_position = today_position[-today_position.stkcd.isin(last_month_position.stkcd)]
+                today_position = today_position.append(last_month_position[last_month_position.stkcd.isin(toselllist)])
+
+                # 统一日期和顺序
                 today_position['time'] = today
-                today_position = today_position.append(tosell_today)
+                today_position = today_position.sort_values("stkcd")
             # 每天最后把今日持仓写入final_result
             final_result = final_result.append(today_position)
             # 把今天赋值给昨天
             yesterday = today
             yesterday_position = today_position.copy()
     return final_result
-
 
 
 def weighttoweight(change_position_day, factor_input_weight, factor):
