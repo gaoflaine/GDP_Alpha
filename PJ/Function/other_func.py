@@ -189,17 +189,18 @@ def position_extension(CPD_position, all_trading_data,
                 selling = selling.append(adjust_weight.query("weight < 0").loc[:, ['time', 'stkcd', 'score', 'weight']])
                 selling['weight'] = abs(selling['weight'])  # weight统一为正
 
-                if len(buying) == 0 :
-                    # 若buying为空，直接填充到月底或季度底
+                # 若buying为空，直接填充到月底或季度底
+                if len(buying) == 0:
                     today_position = group.copy()
                     for i in period[period.index(today):]:
                         today_position['time'] = i
                         final_result = final_result.append(today_position)
                         last_month_position = today_position.copy()
                     break
+
                 # 查找buying和selling的交易状态
-                selling = pd.merge(selling, status_limit, on=['time', 'stkcd'])
-                buying = pd.merge(buying, status_limit, on=['time', 'stkcd'])
+                selling = pd.merge(selling, status_limit[status_limit.time == today], on='stkcd')
+                buying = pd.merge(buying, status_limit[status_limit.time == today], on='stkcd')
 
                 # 确定tosell，并计算tosell的总权重
                 tosell = selling[(selling.status != 'Trading') | (selling.LimitUD == -1)][['stkcd', 'score', 'weight']]
@@ -210,9 +211,13 @@ def position_extension(CPD_position, all_trading_data,
                 buy_available = buying[(buying.status == 'Trading') & (buying.LimitUD != 1)]. \
                     sort_values('score', ascending=False)
 
-                # 算出仓位不够买入的股票
+                # 算出仓位不够买入的股票，
+                ## 对于上个月和这个月都持有的股票，取二者中weight较小的作为底部持仓
+                adjust_weight.loc[adjust_weight['weight'] >= 0, 'weight_plus'] = adjust_weight['weight_yesterday']
+                adjust_weight.loc[adjust_weight['weight'] < 0, 'weight_plus'] = adjust_weight['weight_yesterday'] + adjust_weight['weight']
+                # !!! todo
                 no_space_tobuy = buy_available[buy_available.weight.cumsum()
-                                               + group[group.stkcd.isin(last_month_position.stkcd)].weight.sum()
+                                               + adjust_weight['weight_plus'].sum()
                                                + weight_tosell > 1]
 
                 # 待买的，两部分，一部分是不可交易的，另一部分是仓位不够买入的
@@ -225,7 +230,8 @@ def position_extension(CPD_position, all_trading_data,
                 today_position = group[-group.stkcd.isin(tobuylist)]
                 if tobuy.stkcd.isin(pluslist).any():
                     # 如果tobuylist有加仓的股票，则要在上个月的持仓中找到该股票以及权重，添加进来
-                    today_position = today_position.append(last_month_position[last_month_position.stkcd.isin(tobuylist)])
+                    today_position = today_position.append(
+                        last_month_position[last_month_position.stkcd.isin(tobuylist)])
 
                 # 第二步，添加tosellist的股票，但是可能会把减仓的股票也添加进来，导致有两行股票代码一样
                 if tosell.stkcd.isin(minuslist).any():
@@ -249,30 +255,28 @@ def position_extension(CPD_position, all_trading_data,
                     break
                 else:
                     selling = pd.merge(tosell, status_limit[status_limit.time == today], on='stkcd')
-                    # 若没有可交易的tosell，则无法买卖，直接跳出循环
-                    if ((selling.status != 'Trading') | (selling.LimitUD == -1)).all():
+                    tosell = selling[(selling.status != 'Trading') | (selling.LimitUD == -1)][
+                        ['stkcd', 'score', 'weight']]
+                    toselllist = list(tosell.stkcd)
+                    # 计算出卖掉的权重
+                    weight_sell = selling[-selling.stkcd.isin(toselllist)].weight.sum()
+
+                    buying = pd.merge(tobuy, status_limit[status_limit.time == today], on='stkcd')
+                    ## !!! todo ‘DR’
+                    if ((buying.status != 'Trading') | (buying.LimitUD == 1)).all():
                         pass
                     else:
-                        tosell = selling[(selling.status != 'Trading') | (selling.LimitUD == -1)][
-                            ['stkcd', 'score', 'weight']]
-                        toselllist = list(tosell.stkcd)
-                        # 计算出卖掉的权重
-                        weight_sell = selling[-selling.stkcd.isin(toselllist)].weight.sum()
-
-                        buying = pd.merge(tobuy, status_limit[status_limit.time == today], on='stkcd')
-                        if ((buying.status != 'Trading') | (buying.LimitUD == 1)).all():
-                            pass
-                        else:
-                            # 算出可买的股票
-                            buy_available = buying[(buying.status == 'Trading') & (buying.LimitUD != 1)] \
-                                .sort_values('score', ascending=False)
-                            # 算出仓位不够买入的股票
-                            no_space_tobuy = buy_available[buy_available.weight.cumsum() +
-                                                           yesterday_position.weight.sum() - weight_sell > 1]
-                            # 待买的，两部分，一部分是不可交易的，另一部分是仓位不够买入的
-                            tobuylist = list(buying[(buying.status != 'Trading') | (buying.LimitUD == 1)].stkcd)
-                            tobuylist.extend(list(no_space_tobuy.stkcd))
-                            tobuy = buying[buying.stkcd.isin(tobuylist)][['stkcd', 'score', 'weight']]
+                        # 算出可买的股票
+                        buy_available = buying[(buying.status == 'Trading') & (buying.LimitUD != 1)] \
+                            .sort_values('score', ascending=False)
+                        # !!! todo
+                        # 算出仓位不够买入的股票
+                        no_space_tobuy = buy_available[buy_available.weight.cumsum() +
+                                                       yesterday_position.weight.sum() - weight_sell > 1]
+                        # 待买的，两部分，一部分是不可交易的，另一部分是仓位不够买入的
+                        tobuylist = list(buying[(buying.status != 'Trading') | (buying.LimitUD == 1)].stkcd)
+                        tobuylist.extend(list(no_space_tobuy.stkcd))
+                        tobuy = buying[buying.stkcd.isin(tobuylist)][['stkcd', 'score', 'weight']]
 
 
                 # 算今天的实际仓位，即保留待卖的，删去待买的
@@ -280,7 +284,8 @@ def position_extension(CPD_position, all_trading_data,
                 today_position = group[-group.stkcd.isin(tobuylist)]
                 if tobuy.stkcd.isin(pluslist).any():
                     # 如果tobuylist有加仓的股票，则要在上个月的持仓中找到该股票以及权重，添加进来
-                    today_position = today_position.append(last_month_position[last_month_position.stkcd.isin(tobuylist)])
+                    today_position = today_position.append(
+                        last_month_position[last_month_position.stkcd.isin(tobuylist)])
 
                 # 第二步，添加tosellist的股票，但是可能会把减仓的股票也添加进来，导致有两行股票代码一样
                 if tosell.stkcd.isin(minuslist).any():
