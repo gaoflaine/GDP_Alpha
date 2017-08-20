@@ -54,16 +54,69 @@ def scorepercent_industry(CPD_factor, weight, CPD_inudstry_weight, CPD_stk_inuds
     def allocate_n(df):
         # copy data
         df = df.copy()
+        result_temp = df.copy()
+        # 初始化result数据
+        result = pd.DataFrame(columns=["time", "industry", "weight", "allocate_num"])
         basic_num = n // len(df)
-        residul_num = n % len(df)
-        df_sort = df.sort_values("weight", ascending=True)
-        # df_basicplus和df_basic构建
-        df_basicplus = df_sort.tail(residul_num)
-        df_basicplus.loc[:, "allocate_num"] = basic_num + 1
-        df_basic = df_sort.head(len(df_sort) - residul_num)
-        df_basic.loc[:, "allocate_num"] = basic_num
-        result = df_basicplus.append(df_basic)
+        residual_num = n % len(df)
+        # 首先result中加入未达到basic_num的行业
+        result_temp.loc[result_temp["num"] <= basic_num, "allocate_num"] = result_temp["num"]
+        result = result.append(result_temp.loc[result_temp["num"] <= basic_num])
+        # 计算basic_number中未分配的数量加入residual_num
+        new_residual_num = (basic_num - result_temp.loc[result_temp["num"] <= basic_num, "allocate_num"]).sum()
+        residual_num = residual_num + new_residual_num
+        # result_temp中删去对应行业
+        result_temp = result_temp.loc[result_temp["num"] > basic_num]
+        while len(result_temp) != 0:
+            if residual_num > len(result_temp):
+                # 修改basic_num和residual_num
+                basic_number_second = residual_num // len(result_temp)
+                residual_num = residual_num % len(result_temp)
+                basic_num = basic_num + basic_number_second
+                # 首先result中加入未达到basic_num的行业
+                result_temp.loc[result_temp["num"] <= basic_num, "allocate_num"] = result_temp["num"]
+                result = result.append(result_temp.loc[result_temp["num"] <= basic_num])
+                # 计算basic_number中未分配的数量加入residual_num
+                new_residual_num = (basic_num - result_temp.loc[result_temp["num"] <= basic_num, "allocate_num"]).sum()
+                residual_num = residual_num + new_residual_num
+                # result_temp中删去对应行业
+                result_temp = result_temp.loc[result_temp["num"] > basic_num]
+
+            # 假设weight越大的行业，一般行业内股票个数也越多
+            elif residual_num <= len(result_temp):
+                # 先根据weight排序
+                result_temp = result_temp.sort_values("weight", ascending=True)
+                while residual_num != 0.0:
+                    # 排序未进入前residul_num的
+                    head_ones = result_temp.head(len(result_temp) - int(residual_num))
+                    head_ones.loc[head_ones["num"] <= basic_num, "allocate_num"] = head_ones["num"]
+                    head_ones.loc[head_ones["num"] > basic_num, "allocate_num"] = basic_num
+                    new_residual_num=(basic_num - head_ones.loc[head_ones["num"] <= basic_num, "allocate_num"]).sum()
+                    residual_num = residual_num + new_residual_num
+                    result = result.append(head_ones)
+                    # 筛选后residual_num个行业
+                    result_temp = result_temp.tail(int(residual_num))
+                    result_temp.loc[result_temp["num"] <= basic_num + 1, "allocate_num"] = result_temp["num"]
+                    residual_num = (
+                        basic_num + 1 - result_temp.loc[result_temp["num"] <= basic_num + 1, "allocate_num"]).sum()
+                    result = result.append(result_temp.loc[result_temp["num"] <= basic_num + 1])
+                    result_temp = result_temp.loc[result_temp["num"] > basic_num + 1]
+                    basic_num = basic_num + 1
+                result_temp.loc[:, "allocate_num"] = basic_num
+                result = result.append(result_temp)
+                result_temp = pd.DataFrame()
         return result
+        # df = df.copy()
+        # basic_num = n // len(df)
+        # residul_num = n % len(df)
+        # df_sort = df.sort_values("weight", ascending=True)
+        # # df_basicplus和df_basic构建
+        # df_basicplus = df_sort.tail(residul_num)
+        # df_basicplus.loc[:, "allocate_num"] = basic_num + 1
+        # df_basic = df_sort.head(len(df_sort) - residul_num)
+        # df_basic.loc[:, "allocate_num"] = basic_num
+        # result = df_basicplus.append(df_basic)
+        # return result
 
     CPD_inudstry_weight = CPD_inudstry_weight.groupby("time").apply(allocate_n).reset_index(drop=True)
 

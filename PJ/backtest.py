@@ -32,6 +32,7 @@ class BackTest:
         self.backperiod = kwargs.get("backperiod", self.global_info.backperiod)
         self.hedgemethod = kwargs.get("hedgemethod", self.global_info.hedgemethod)
         self.margin = kwargs.get("margin", self.global_info.margin)
+        self.tradecost = kwargs.get("tradecost", self.global_info.tradecost)
 
         # 连接数据库
         self.connection = MySQLite(self.path)
@@ -89,20 +90,24 @@ class BackTest:
                                                                                            self.universe)
         # 得到交易状态表
         self.trade_status = self.connection.get_factors(self.start, self.end, ["status"], self.universe)
-        # 获取涨跌停数据
+        # 获取涨跌停数据(规则：开盘价相比于昨日收盘价上涨大于等于9.5%：1；开盘价相比于昨日收盘价下跌大于等于9.5%：-1；其他：0)
         self.trade_limit = self.connection.get_factors(self.start, self.end, ["LimitUD"], self.universe)
 
     # 输入因子表和行情表，返回调仓日的因子权重表
     def factor_weight(self):
+        # 用户主动输入因子权重
         if self.weightType == 0:
             self.weight = other_func.weighttoweight(self.change_position_day, self.factor_input_weight, self.factor)
 
+        # 等权重和PCA方法
         elif self.weightType in [1, 2]:
             self.weight = self.global_info.factor_weight[self.weightType](self.all_factor_data, self.all_trading_data,
                                                                           self.change_position_day, self.backperiod,
                                                                           self.all_tradingday, self.benchmark)
+            # 根据用户输入方向进行调整
             for i in range(self.weight.shape[1] - 1):
                 self.weight.iloc[:, i + 1] = self.weight.iloc[:, i + 1] * self.factor_direction[i]
+        # 回归方法的到因子权重
         else:
             self.weight = self.global_info.factor_weight[self.weightType](self.all_factor_data, self.all_trading_data,
                                                                           self.change_position_day, self.backperiod,
@@ -110,7 +115,6 @@ class BackTest:
 
     # 输入因子表、因子权重序列，获得每日持仓;使用scorepercent方式进行选股排序，得到调仓日的持仓表
     # n：股票个数,top:  搞个接口来做这个东西
-    # 修改
     def get_position(self, condition="top"):
         # 得到调仓日的factor data
         self.CPD_factor = other_func.get_tradefactor(self.all_factor_data, self.change_position_day)
@@ -124,7 +128,7 @@ class BackTest:
             # 根据positionType进行仓位分配，获得调仓日的仓位表
             self.CPD_position = self.global_info.position_weight[self.positionType](symbol=self.symbol, ev=self.ev,
                                                                                     vol=self.vol)
-        # 进行行业市值中性处理
+        # 进行行业市值中性处理(暂时默认仓位分配为等权重处理#todo：加入positionType，多种权重方式)
         elif self.industry_neutral == 1:
             self.CPD_position = score_method.scorepercent_industry(self.CPD_factor, self.weight,
                                                                    self.CPD_inudstry_weight,
@@ -133,23 +137,23 @@ class BackTest:
     # 输入每日选股持仓表，得到全部交易日的持仓表
     def position_restrict(self):
         # 根据调仓日的实际持仓表，展期到全部的相关交易日，确定为当日的持仓
-        # 处理了涨跌停、停牌
-        # 返回当日的实际持仓表、每日的交易成本和股票的具体买卖时点
+        # 处理了涨跌停、停牌等限制，返回当日的实际持仓表
         self.all_tradedate_position = other_func.position_extension(self.CPD_position,
-                                                                               self.all_trading_data,
-                                                                               self.all_tradingday,
-                                                                               self.change_position_day,
-                                                                               self.freq, self.trade_status,
-                                                                               self.trade_limit)
-        # 最终传入的都是当日的实际持仓！
+                                                                    self.all_trading_data,
+                                                                    self.all_tradingday,
+                                                                    self.change_position_day,
+                                                                    self.freq, self.trade_status,
+                                                                    self.trade_limit)
 
     # 输入全部交易日的实际持仓表（考虑涨跌停等限制后），返回策略的净值表现
     def get_portfolio(self):
-        # 计算具体买卖股票的时间点和交易成本
+        # 根据每日的实际持仓，计算每日交易成本表和股票具体买卖点
         self.trade_detail, self.cost = perform.get_cost(self.all_tradedate_position)
-        self.portfolio = perform.get_portfolio(self.all_tradedate_position,
-                                                                         self.all_trading_data,
-                                                                         self.benchmark, self.hedgemethod, self.margin)
+
+        # 输入每日持仓表、每日交易成本、股票具体买卖点、行情数据表、对冲方法和基准标的，返回净值表现
+        self.portfolio = perform.get_portfolio(self.all_tradedate_position, self.trade_detail, self.cost,
+                                               self.all_trading_data,
+                                               self.benchmark, self.hedgemethod, self.margin, self.tradecost)
 
     def run(self):
         self.get_data()
@@ -158,21 +162,22 @@ class BackTest:
         self.position_restrict()
         self.get_portfolio()
 
+
 if __name__ == "__main__":
     para_dict = {
-        # "path": 'D:\strategy\GDP\GD.db',
-         "path": 'F:\project_gdp\GD.db',
+        "path": 'D:\strategy\GDP\GD.db',
+        #  "path": 'F:\project_gdp\GD.db',
         "factor": ["pb"],
         # "weightType": 3,
         "n": 10,
         "industry_neutral": 0,
         "weightType": 1,
+        "positionType": 2,
         "factor_direction": [1],
         # "weightType": 0,
         # "factor_weight": [0.5, -0.5],
         "start": "2010-01-01",
-        "end": "2013-01-01",
-        "positionType": 2,
+        "end": "2012-01-01",
         "backperiod": 20,
         "hedgemethod": 1
     }
@@ -190,8 +195,8 @@ if __name__ == "__main__":
     # backtest.all_tradedate_position.to_csv("all_tradedate_position.csv")
     # print(backtest.daily_return)
     print(backtest.portfolio)
-    print(backtest.cost)
-    print(backtest.trade_detail)
+    # print(backtest.cost)
+    # print(backtest.trade_detail)
     # import pickle
     # pickle.dump(backtest.trade_status,open("trade_status","wb"))
     # pickle.dump(backtest.factor_data, open("factor_data", "wb"))

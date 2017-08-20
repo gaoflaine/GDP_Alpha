@@ -46,31 +46,32 @@ class MySQLite:
         return factor_merge
 
     # 返回所有股票和基准标的收盘价和昨日收盘价
-    def get_trading(self, start, end,  benchmark, universe=None):
+    def get_trading(self, start, end, benchmark, universe=None):
+        # 指数的开盘数据不需要，暂时使用收盘数据代替 #todo：修改为真正的开盘数据
         if universe is None:
             SQL = '''
-            select time, stkcd, closep, preclosep
+            select time, stkcd, closep, preclosep, openp
             from BasicInfo
             where time between '{start}' and '{end}' 
             union all
-            select time, stkcd, closep, preclosep
+            select time, stkcd, closep, preclosep, closep as openp
             from indexprice
             where time between '{start}' and '{end}' 
             and stkcd = '{benchmark}'
             '''.format(start=start, end=end, benchmark=benchmark)
         else:
             SQL = '''
-                    select t1.time, t1.stkcd, t1.closep, t1.preclosep
-                    from Basicinfo as t1
-                    join indexweight as t2
-                    on t1.time = t2.time and t1.stkcd = t2.stkcd
-                    where t2.indexname = '{universe}' and t1.time between '{start}' and '{end}'
-                    union all
-                    select time, stkcd, closep, preclosep
-                    from indexprice
-                    where time between '{start}' and '{end}'
-                    and stkcd = '{benchmark}'
-                '''.format(start=start, end=end, benchmark=benchmark, universe=universe)
+            select t1.time, t1.stkcd, t1.closep, t1.preclosep, t1.openp
+            from Basicinfo as t1
+            join indexweight as t2
+            on t1.time = t2.time and t1.stkcd = t2.stkcd
+            where t2.indexname = '{universe}' and t1.time between '{start}' and '{end}'
+            union all
+            select time, stkcd, closep, preclosep, closep as openp
+            from indexprice
+            where time between '{start}' and '{end}'
+            and stkcd = '{benchmark}'
+            '''.format(start=start, end=end, benchmark=benchmark, universe=universe)
 
             # print(pd.read_sql_query(SQL, self.conn))
         return pd.read_sql_query(SQL, self.conn)
@@ -85,15 +86,11 @@ class MySQLite:
             where t1.time in {period} and t1.indexname = '{universe}'
             '''.format(period='(\'' + '\',\''.join(list(change_position_day.time)) + '\')', universe=universe)
         SQL2 = '''
-            select t1.time, t1.industry as industry, t1.weight
+            select t1.time, t1.industry as industry, t1.weight,t1.num
             from industryweight as t1
             where t1.time in {period}
             and t1.indexname = '{universe}' 
             '''.format(period='(\'' + '\',\''.join(list(change_position_day.time)) + '\')', universe=universe)
-        CPD_stk_inudstry=pd.read_sql_query(SQL1, self.conn)
-        CPD_inudstry_weight=pd.read_sql_query(SQL2, self.conn)
+        CPD_stk_inudstry = pd.read_sql_query(SQL1, self.conn)
+        CPD_inudstry_weight = pd.read_sql_query(SQL2, self.conn)
         return CPD_stk_inudstry, CPD_inudstry_weight
-
-
-
-

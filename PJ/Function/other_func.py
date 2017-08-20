@@ -160,6 +160,8 @@ def position_extension(CPD_position, all_trading_data,
     yesterday_position = pd.DataFrame(columns=['time', 'stkcd', 'score', 'weight'])
     final_result = pd.DataFrame()
     for (name, group), period in zip(CPD_position.groupby('time'), position_period):
+        # copy数据，防止数据污染
+        group=group.copy()
         for today in period:
             today_position = pd.DataFrame(columns=['time', 'stkcd', 'weight'])  # 重置数据
             if today == name:

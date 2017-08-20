@@ -28,6 +28,7 @@ import numpy as np
 #     portfolio.loc[:, "value"] = (daily_return.loc[:, 'value'] + 1).cumprod()
 #     return daily_return, portfolio
 
+# 获得每日交易成本和每日股票买卖点
 def get_cost(all_tradedate_position):
     j = 0
     trade_detail = pd.DataFrame(columns=['time', 'stkcd', 'delta_weight', 'direction'])
@@ -53,29 +54,87 @@ def get_cost(all_tradedate_position):
     return trade_detail, cost
 
 
-
-def get_portfolio(all_tradedate_position, all_trading_data, benchmark, hedgemethod, margin):
+def get_portfolio(all_tradedate_position, trade_detail, daily_cost, all_trading_data, benchmark, hedgemethod, margin,
+                  tradecost):
     # 取得参数的deepcopy 防止污染参数数据
     all_tradedate_position = all_tradedate_position.copy()
     all_trading_data = all_trading_data.copy()
+    trade_detail = trade_detail.copy()
+    daily_cost = daily_cost.copy()
 
-    # 两张表merge
+    # 处理daily_cost
+    daily_cost.loc[:, "daily_cost"] = daily_cost["cost"] * tradecost
+
+    # 计算每日每只股票的收益率
+    # 交易日实际持仓表和行情表进行merge,得到带行情的持仓表
     all_tradedate_position = pd.merge(all_tradedate_position, all_trading_data, on=['time', 'stkcd'])
-    # 计算得的股票在每天的收益（可能使用其他的计算方法）
-    all_tradedate_position.loc[:, "return"] = (np.log(all_tradedate_position.loc[:, "closep"]) - np.log(
-        all_tradedate_position.loc[:, "preclosep"])) * all_tradedate_position.loc[:, "weight"]
-    all_tradedate_position = all_tradedate_position.loc[:, ["time", "return"]]
+    # 带行情的持仓表和trade_detail表进行merge
+    all_tradedate_position = pd.merge(all_tradedate_position, trade_detail, on=["time", "stkcd"], how="left")
+    # 股票交易状态为四种：增仓、新增、减仓、踢出和不变
 
-    # 得到每日净值变化
+    # direction等于True的，即今日进行增仓或新增的股票。
+    # 增加的仓位使用close-open，保留的仓位使用close-preclose
+    all_tradedate_position.loc[all_tradedate_position.direction == True, "return"] = \
+        (np.log(all_tradedate_position.loc[:, "closep"]) - np.log(all_tradedate_position.loc[:, "preclosep"])) \
+        * (all_tradedate_position.loc[:, "weight"] - all_tradedate_position.loc[:, "delta_weight"]) + \
+        (np.log(all_tradedate_position.loc[:, "closep"]) - np.log(all_tradedate_position.loc[:, "openp"])) \
+        * (all_tradedate_position.loc[:, "delta_weight"])
+    # direction等于False的，即今日进行减仓的股票。
+    # 减仓部分使用open-preclose，保留的部分使用close-preclose
+    all_tradedate_position.loc[all_tradedate_position.direction == False, "return"] = \
+        (np.log(all_tradedate_position.loc[:, "closep"]) - np.log(all_tradedate_position.loc[:, "preclosep"])) \
+        * (all_tradedate_position.loc[:, "weight"]) + \
+        (np.log(all_tradedate_position.loc[:, "openp"]) - np.log(all_tradedate_position.loc[:, "preclosep"])) \
+        * (all_tradedate_position.loc[:, "delta_weight"])
+    # direction等于NA，即今日股票未交易。使用close-preclose
+    all_tradedate_position.loc[
+        (all_tradedate_position.direction != True) & (all_tradedate_position.direction != False), "return"] = \
+        (np.log(all_tradedate_position.loc[:, "closep"]) - np.log(all_tradedate_position.loc[:, "preclosep"])) \
+        * (all_tradedate_position.loc[:, "weight"])
+
+    # 和dailycost合并，汇总一次daily_return,作为all_tradedate_position_summary。再单独处理踢出的股票
+    all_tradedate_position_summary = pd.merge(all_tradedate_position, daily_cost, on=['time']).loc[:,
+                             ["time", "return", "daily_cost"]]
     def sum_all(df):
         df = df.copy()
-        df.loc[:, 'value'] = np.sum(df.loc[:, "return"])
+        # 汇总当日return并减去当日的交易成本
+        df.loc[:, 'value'] = np.sum(df.loc[:, "return"]) - df.loc[:, "daily_cost"].iloc[0]
         return df.head(1)
 
-    daily_return = all_tradedate_position.groupby('time').apply(sum_all).reset_index(drop=True).loc[:,
+    daily_return = all_tradedate_position_summary.groupby('time').apply(sum_all).reset_index(drop=True).loc[:,
                    ["time", "value"]]
+    # 在trade_detail里的direction等于false，但股票不在对应交易日的all_tradedate_position里，即今日踢出的股票
+    # 使用open-preclose
+    # 将trade_detail和all_trading_data进行合并
+    trade_detail=pd.merge(trade_detail,all_trading_data,on=["time","stkcd"],how="left")
+    for time, group in trade_detail.groupby("time"):
+        group=group.copy()
+        # 对应time的当日持仓表all_tradedate_position
+        time_stk_list=list(all_tradedate_position.loc[all_tradedate_position.time==time].stkcd)
+        # 关心的标的
+        ind=(group.direction==False)&(-group.stkcd.isin(time_stk_list))
+        group.loc[ind,"return"]=(np.log(group.loc[:, "openp"]) - np.log(group.loc[:, "preclosep"])) \
+                                * (group.loc[:, "delta_weight"])
+        # 修改daily_return表即可,增加当日踢出股票带来的收益
+        daily_return.loc[daily_return.time==time,"value"]=daily_return.loc[daily_return.time==time,"value"]+group.loc[ind,"return"].sum()
+
+    # # 计算得的股票在每天的收益（可能使用其他的计算方法）
+    # all_tradedate_position.loc[:, "return"] = (np.log(all_tradedate_position.loc[:, "closep"]) - np.log(
+    #     all_tradedate_position.loc[:, "preclosep"])) * all_tradedate_position.loc[:, "weight"]
+    # all_tradedate_position = all_tradedate_position.loc[:, ["time", "return"]]
+    #
+    # # 得到每日净值变化
+    #
+    # def sum_all(df):
+    #     df = df.copy()
+    #     df.loc[:, 'value'] = np.sum(df.loc[:, "return"])
+    #     return df.head(1)
+    #
+    # daily_return = all_tradedate_position.groupby('time').apply(sum_all).reset_index(drop=True).loc[:,
+    #                ["time", "value"]]
 
     # 对冲
+    # todo:是否按照当日实际仓位对冲
     if hedgemethod == 1:
         benchmark_return = all_trading_data[all_trading_data.stkcd == benchmark]
         benchmark_return.loc[:, 'return'] = np.log(benchmark_return.closep) - np.log(benchmark_return.preclosep)
