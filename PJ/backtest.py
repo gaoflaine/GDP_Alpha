@@ -165,8 +165,8 @@ class BackTest:
 
 if __name__ == "__main__":
     para_dict = {
-        "path": 'D:\strategy\GDP\GD.db',
-        #  "path": 'F:\project_gdp\GD.db',
+        # "path": 'D:\strategy\GDP\GD.db',
+        "path": 'F:\project_gdp\GD.db',
         "factor": ["pb"],
         # "weightType": 3,
         "n": 10,
