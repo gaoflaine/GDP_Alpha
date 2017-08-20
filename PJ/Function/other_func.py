@@ -214,7 +214,8 @@ def position_extension(CPD_position, all_trading_data,
                 # 算出仓位不够买入的股票，
                 ## 对于上个月和这个月都持有的股票，取二者中weight较小的作为底部持仓
                 adjust_weight.loc[adjust_weight['weight'] >= 0, 'weight_plus'] = adjust_weight['weight_yesterday']
-                adjust_weight.loc[adjust_weight['weight'] < 0, 'weight_plus'] = adjust_weight['weight_yesterday'] + adjust_weight['weight']
+                adjust_weight.loc[adjust_weight['weight'] < 0, 'weight_plus'] = adjust_weight['weight_yesterday'] + \
+                                                                                adjust_weight['weight']
                 # !!! todo
                 no_space_tobuy = buy_available[buy_available.weight.cumsum()
                                                + adjust_weight['weight_plus'].sum()
@@ -236,7 +237,9 @@ def position_extension(CPD_position, all_trading_data,
                 # 第二步，添加tosellist的股票，但是可能会把减仓的股票也添加进来，导致有两行股票代码一样
                 if tosell.stkcd.isin(minuslist).any():
                     # 如果toselllist有减仓的股票，则要先把该股票扣除，以避免重复
-                    today_position = today_position[-today_position.stkcd.isin(last_month_position.stkcd)]
+                    # 获取toselllist中属于减仓的股票
+                    tosell_in_minuslist = list(tosell.stkcd.isin(minuslist))
+                    today_position = today_position[-today_position.stkcd.isin(tosell_in_minuslist)]
                 today_position = today_position.append(last_month_position[last_month_position.stkcd.isin(toselllist)])
 
                 # 统一日期和顺序
@@ -278,7 +281,6 @@ def position_extension(CPD_position, all_trading_data,
                         tobuylist.extend(list(no_space_tobuy.stkcd))
                         tobuy = buying[buying.stkcd.isin(tobuylist)][['stkcd', 'score', 'weight']]
 
-
                 # 算今天的实际仓位，即保留待卖的，删去待买的
                 # 第一步，删去tobuylist的股票，但是可能会把加仓的股票也删掉
                 today_position = group[-group.stkcd.isin(tobuylist)]
@@ -290,7 +292,9 @@ def position_extension(CPD_position, all_trading_data,
                 # 第二步，添加tosellist的股票，但是可能会把减仓的股票也添加进来，导致有两行股票代码一样
                 if tosell.stkcd.isin(minuslist).any():
                     # 如果toselllist有减仓的股票，则要先把该股票扣除，以避免重复
-                    today_position = today_position[-today_position.stkcd.isin(last_month_position.stkcd)]
+                    # 获取toselllist中属于减仓的股票
+                    tosell_in_minuslist = list(tosell.stkcd.isin(minuslist))
+                    today_position = today_position[-today_position.stkcd.isin(tosell_in_minuslist)]
                 today_position = today_position.append(last_month_position[last_month_position.stkcd.isin(toselllist)])
 
                 # 统一日期和顺序
