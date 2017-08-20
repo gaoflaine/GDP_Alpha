@@ -205,12 +205,12 @@ def position_extension(CPD_position, all_trading_data,
                 buying = pd.merge(buying, status_limit[status_limit.time == today], on='stkcd')
 
                 # 确定tosell，并计算tosell的总权重
-                tosell = selling[(selling.status != 'Trading') | (selling.LimitUD == -1)][['stkcd', 'score', 'weight']]
+                tosell = selling[(selling.status == 'Suspension') | (selling.LimitUD == -1)][['stkcd', 'score', 'weight']]
                 toselllist = list(tosell.stkcd)
                 weight_tosell = tosell.weight.sum()
 
                 # 算出可买的股票
-                buy_available = buying[(buying.status == 'Trading') & (buying.LimitUD != 1)]. \
+                buy_available = buying[(buying.status != 'Suspension') & (buying.LimitUD != 1)]. \
                     sort_values('score', ascending=False)
 
                 # 算出仓位不够买入的股票，
@@ -224,7 +224,7 @@ def position_extension(CPD_position, all_trading_data,
                                                + weight_tosell > 1]
 
                 # 待买的，两部分，一部分是不可交易的，另一部分是仓位不够买入的
-                tobuylist = list(buying[(buying.status != 'Trading') | (buying.LimitUD == 1)].stkcd)
+                tobuylist = list(buying[(buying.status == 'Suspension') | (buying.LimitUD == 1)].stkcd)
                 tobuylist.extend(list(no_space_tobuy.stkcd))
                 tobuy = buying[buying.stkcd.isin(tobuylist)][['stkcd', 'score', 'weight']]
 
@@ -260,26 +260,26 @@ def position_extension(CPD_position, all_trading_data,
                     break
                 else:
                     selling = pd.merge(tosell, status_limit[status_limit.time == today], on='stkcd')
-                    tosell = selling[(selling.status != 'Trading') | (selling.LimitUD == -1)][
+                    tosell = selling[(selling.status == 'Suspension') | (selling.LimitUD == -1)][
                         ['stkcd', 'score', 'weight']]
                     toselllist = list(tosell.stkcd)
                     # 计算出卖掉的权重
                     weight_sell = selling[-selling.stkcd.isin(toselllist)].weight.sum()
 
                     buying = pd.merge(tobuy, status_limit[status_limit.time == today], on='stkcd')
-                    ## !!! todo ‘DR’
-                    if ((buying.status != 'Trading') | (buying.LimitUD == 1)).all():
+
+                    if ((buying.status == 'Suspension') | (buying.LimitUD == 1)).all():
                         pass
                     else:
                         # 算出可买的股票
-                        buy_available = buying[(buying.status == 'Trading') & (buying.LimitUD != 1)] \
+                        buy_available = buying[(buying.status != 'Suspension') & (buying.LimitUD != 1)] \
                             .sort_values('score', ascending=False)
                         # !!! todo
                         # 算出仓位不够买入的股票
                         no_space_tobuy = buy_available[buy_available.weight.cumsum() +
                                                        yesterday_position.weight.sum() - weight_sell > 1]
                         # 待买的，两部分，一部分是不可交易的，另一部分是仓位不够买入的
-                        tobuylist = list(buying[(buying.status != 'Trading') | (buying.LimitUD == 1)].stkcd)
+                        tobuylist = list(buying[(buying.status == 'Suspension') | (buying.LimitUD == 1)].stkcd)
                         tobuylist.extend(list(no_space_tobuy.stkcd))
                         tobuy = buying[buying.stkcd.isin(tobuylist)][['stkcd', 'score', 'weight']]
 
