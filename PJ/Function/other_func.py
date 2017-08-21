@@ -161,8 +161,11 @@ def position_extension(CPD_position, all_trading_data,
     final_result = pd.DataFrame()
     for (name, group), period in zip(CPD_position.groupby('time'), position_period):
         # copy数据，防止数据污染
-        group=group.copy()
+        group = group.copy()
         for today in period:
+            if today == '2010-06-01':
+                print(1)
+                pass
             today_position = pd.DataFrame(columns=['time', 'stkcd', 'weight'])  # 重置数据
             if today == name:
                 # 换仓日，仓位保持与上个月一样
@@ -204,28 +207,49 @@ def position_extension(CPD_position, all_trading_data,
                 selling = pd.merge(selling, status_limit[status_limit.time == today], on='stkcd')
                 buying = pd.merge(buying, status_limit[status_limit.time == today], on='stkcd')
 
-                # 确定tosell，并计算tosell的总权重
-                tosell = selling[(selling.status == 'Suspension') | (selling.LimitUD == -1)][['stkcd', 'score', 'weight']]
+                # 确定tosell
+                tosell = selling[(selling.status == 'Suspension') | (selling.LimitUD == -1)][
+                    ['stkcd', 'score', 'weight']]
                 toselllist = list(tosell.stkcd)
-                weight_tosell = tosell.weight.sum()
+
+                # 算出仓位不够买入的股票
+                ## 对于上个月和这个月都持有的股票，取二者中weight较小的作为底部持仓
+                adjust_weight.loc[adjust_weight['weight'] >= 0, 'weight_plus'] = adjust_weight['weight_yesterday']
+                adjust_weight.loc[adjust_weight['weight'] < 0, 'weight_plus'] = adjust_weight['weight_yesterday'] + \
+                                                                                adjust_weight['weight']
+
+                # 计算还可以买进的权重上限weight_left
+                weight_left = 1 - (adjust_weight['weight_plus'].sum() + tosell.weight.sum())
 
                 # 算出可买的股票
                 buy_available = buying[(buying.status != 'Suspension') & (buying.LimitUD != 1)]. \
                     sort_values('score', ascending=False)
 
-                # 算出仓位不够买入的股票，
-                ## 对于上个月和这个月都持有的股票，取二者中weight较小的作为底部持仓
-                adjust_weight.loc[adjust_weight['weight'] >= 0, 'weight_plus'] = adjust_weight['weight_yesterday']
-                adjust_weight.loc[adjust_weight['weight'] < 0, 'weight_plus'] = adjust_weight['weight_yesterday'] + \
-                                                                                adjust_weight['weight']
-                # !!! todo
-                no_space_tobuy = buy_available[buy_available.weight.cumsum()
-                                               + adjust_weight['weight_plus'].sum()
-                                               + weight_tosell > 1]
+
+                # 在可买的股票里计算出哪些仓位不够买入，记作no_space_tobuy
+                no_space_tobuy = []
+
+                '''
+                    具体算法为以下这个函数，
+                    对buy_available逐行检查，若该行的weight小于weight_left，则可以买入，直接检查下一行
+                    若该行的weight大于weight_left,则把该股票记入no_space_tobuy里，再检查下一行
+                '''
+                def get_no_space_tobuy(weight_left, buy_available, no_space_tobuy):
+                    if len(buy_available) == 1:
+                        if round(buy_available['weight'].iloc[0], 6) > round(weight_left, 6):
+                            no_space_tobuy.append(buy_available['stkcd'].iloc[0])
+                        return None
+                    if buy_available['weight'].iloc[0] < weight_left:
+                        return get_no_space_tobuy(weight_left - buy_available['weight'].iloc[0],
+                                                  buy_available.iloc[1:, :], no_space_tobuy)
+                    else:
+                        no_space_tobuy.append(buy_available['stkcd'].iloc[0])
+                        return get_no_space_tobuy(weight_left, buy_available.iloc[1:, :], no_space_tobuy)
+                get_no_space_tobuy(weight_left, buy_available, no_space_tobuy)
 
                 # 待买的，两部分，一部分是不可交易的，另一部分是仓位不够买入的
                 tobuylist = list(buying[(buying.status == 'Suspension') | (buying.LimitUD == 1)].stkcd)
-                tobuylist.extend(list(no_space_tobuy.stkcd))
+                tobuylist.extend(no_space_tobuy)
                 tobuy = buying[buying.stkcd.isin(tobuylist)][['stkcd', 'score', 'weight']]
 
                 # 算今天的实际仓位，即保留待卖的，删去待买的
@@ -271,16 +295,40 @@ def position_extension(CPD_position, all_trading_data,
                     if ((buying.status == 'Suspension') | (buying.LimitUD == 1)).all():
                         pass
                     else:
+                        # 计算还可以买进的权重上限weight_left
+                        weight_left = 1 - (yesterday_position.weight.sum() - weight_sell)
+
                         # 算出可买的股票
-                        buy_available = buying[(buying.status != 'Suspension') & (buying.LimitUD != 1)] \
-                            .sort_values('score', ascending=False)
-                        # !!! todo
-                        # 算出仓位不够买入的股票
-                        no_space_tobuy = buy_available[buy_available.weight.cumsum() +
-                                                       yesterday_position.weight.sum() - weight_sell > 1]
+                        buy_available = buying[(buying.status != 'Suspension') & (buying.LimitUD != 1)]. \
+                            sort_values('score', ascending=False)
+
+                        # 在可买的股票里计算出哪些仓位不够买入，记作no_space_tobuy
+                        no_space_tobuy = []
+
+                        '''
+                            具体算法为以下这个函数，
+                            对buy_available逐行检查，若该行的weight小于weight_left，则可以买入，直接检查下一行
+                            若该行的weight大于weight_left,则把该股票记入no_space_tobuy里，再检查下一行
+                        '''
+
+                        def get_no_space_tobuy(weight_left, buy_available, no_space_tobuy):
+                            if len(buy_available) == 1:
+                                if round(buy_available['weight'].iloc[0], 6) > round(weight_left, 6):
+                                    no_space_tobuy.append(buy_available['stkcd'].iloc[0])
+                                return None
+                            if buy_available['weight'].iloc[0] < weight_left:
+                                return get_no_space_tobuy(weight_left - buy_available['weight'].iloc[0],
+                                                          buy_available.iloc[1:, :], no_space_tobuy)
+                            else:
+                                no_space_tobuy.append(buy_available['stkcd'].iloc[0])
+                                return get_no_space_tobuy(weight_left, buy_available.iloc[1:, :], no_space_tobuy)
+                        get_no_space_tobuy(weight_left, buy_available, no_space_tobuy)
+
+
+
                         # 待买的，两部分，一部分是不可交易的，另一部分是仓位不够买入的
                         tobuylist = list(buying[(buying.status == 'Suspension') | (buying.LimitUD == 1)].stkcd)
-                        tobuylist.extend(list(no_space_tobuy.stkcd))
+                        tobuylist.extend(no_space_tobuy)
                         tobuy = buying[buying.stkcd.isin(tobuylist)][['stkcd', 'score', 'weight']]
 
                 # 算今天的实际仓位，即保留待卖的，删去待买的
@@ -330,3 +378,6 @@ def exclude_suspension(CPD_factor, trade_status):
     result = result.dropna()
     result = result[result.status != "Suspension"]
     return result.drop("status", axis=1)
+
+
+
