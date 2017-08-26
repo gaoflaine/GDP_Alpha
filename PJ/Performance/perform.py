@@ -94,7 +94,8 @@ def get_portfolio(all_tradedate_position, trade_detail, daily_cost, all_trading_
 
     # 和dailycost合并，汇总一次daily_return,作为all_tradedate_position_summary。再单独处理踢出的股票
     all_tradedate_position_summary = pd.merge(all_tradedate_position, daily_cost, on=['time']).loc[:,
-                             ["time", "return", "daily_cost"]]
+                                     ["time", "return", "daily_cost"]]
+
     def sum_all(df):
         df = df.copy()
         # 汇总当日return并减去当日的交易成本
@@ -106,17 +107,18 @@ def get_portfolio(all_tradedate_position, trade_detail, daily_cost, all_trading_
     # 在trade_detail里的direction等于false，但股票不在对应交易日的all_tradedate_position里，即今日踢出的股票
     # 使用open-preclose
     # 将trade_detail和all_trading_data进行合并
-    trade_detail=pd.merge(trade_detail,all_trading_data,on=["time","stkcd"],how="left")
+    trade_detail = pd.merge(trade_detail, all_trading_data, on=["time", "stkcd"], how="left")
     for time, group in trade_detail.groupby("time"):
-        group=group.copy()
+        group = group.copy()
         # 对应time的当日持仓表all_tradedate_position
-        time_stk_list=list(all_tradedate_position.loc[all_tradedate_position.time==time].stkcd)
+        time_stk_list = list(all_tradedate_position.loc[all_tradedate_position.time == time].stkcd)
         # 关心的标的
-        ind=(group.direction==False)&(-group.stkcd.isin(time_stk_list))
-        group.loc[ind,"return"]=(np.log(group.loc[:, "openp"]) - np.log(group.loc[:, "preclosep"])) \
-                                * (group.loc[:, "delta_weight"])
+        ind = (group.direction == False) & (-group.stkcd.isin(time_stk_list))
+        group.loc[ind, "return"] = (np.log(group.loc[:, "openp"]) - np.log(group.loc[:, "preclosep"])) \
+                                   * (group.loc[:, "delta_weight"])
         # 修改daily_return表即可,增加当日踢出股票带来的收益
-        daily_return.loc[daily_return.time==time,"value"]=daily_return.loc[daily_return.time==time,"value"]+group.loc[ind,"return"].sum()
+        daily_return.loc[daily_return.time == time, "value"] = daily_return.loc[daily_return.time == time, "value"] + \
+                                                               group.loc[ind, "return"].sum()
 
     # # 计算得的股票在每天的收益（可能使用其他的计算方法）
     # all_tradedate_position.loc[:, "return"] = (np.log(all_tradedate_position.loc[:, "closep"]) - np.log(
@@ -147,15 +149,23 @@ def get_portfolio(all_tradedate_position, trade_detail, daily_cost, all_trading_
     portfolio.loc[:, "value_hedged"] = np.cumprod((daily_return_hedged.loc[:, 'value_hedged'] + 1))
     return portfolio
 
+
 # def get_transaction(indicator_matrix):
 #     pass
 #
 #
-# # 输入净值矩阵，返回最大回撤
-# def get_maxdrawdown(value):
-#     get_max = value.expanding().max()
-#     drawdown = (get_max - value) * 1.0 / get_max
-#     return drawdown.max()
+# 计算最大回撤率
+def get_maxdrawdown(portfolio):
+    max_return = np.fmax.accumulate(portfolio)
+    return np.nanmin((portfolio - max_return) / max_return)
+
+# 输入每日交易盈亏，返回年化收益率
+def get_annual_return(portfolio):
+    return (1 + np.mean(portfolio, axis=0)) ** 250 - 1
+
+# 输入每日交易盈亏，返回年化波动率
+def get_volatility(final):
+    return np.std(final, axis=0) * np.sqrt(250)
 
 
 # # 输入每日交易盈亏和无风险利率，返回夏普比率
@@ -163,14 +173,10 @@ def get_portfolio(all_tradedate_position, trade_detail, daily_cost, all_trading_
 #     return (annual_return - r) / annual_volatility
 #
 #
-# # 输入每日交易盈亏，返回波动率
-# def get_volatility(final):
-#     return np.std(final, axis=0) * np.sqrt(250)
+
 #
 #
-# # 输入每日交易盈亏，返回年化收益率
-# def get_annual_return(final):
-#     return (1 + np.mean(final, axis=0)) ** 250 - 1
+
 #
 #
 # # 组合beta
