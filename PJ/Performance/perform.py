@@ -69,8 +69,8 @@ def get_portfolio(all_tradedate_position, trade_detail, daily_cost, all_trading_
     # 交易日实际持仓表和行情表进行merge,得到带行情的持仓表
     all_tradedate_position = pd.merge(all_tradedate_position, all_trading_data, on=['time', 'stkcd'])
     # 带行情的持仓表和trade_detail表进行merge
-    all_tradedate_position = pd.merge(all_tradedate_position, trade_detail, on=["time", "stkcd"], how="left")
-    # 股票交易状态为四种：增仓、新增、减仓、踢出和不变
+    all_tradedate_position = pd.merge(all_tradedate_position, trade_detail, on=["time", "stkcd"], how="outer")
+    # 股票交易状态为四种：增仓、减仓、踢出和不变
 
     # direction等于True的，即今日进行增仓或新增的股票。
     # 增加的仓位使用close-open，保留的仓位使用close-preclose
@@ -79,16 +79,27 @@ def get_portfolio(all_tradedate_position, trade_detail, daily_cost, all_trading_
         * (all_tradedate_position.loc[:, "weight"] - all_tradedate_position.loc[:, "delta_weight"]) + \
         (np.log(all_tradedate_position.loc[:, "closep"]) - np.log(all_tradedate_position.loc[:, "openp"])) \
         * (all_tradedate_position.loc[:, "delta_weight"])
-    # direction等于False的，即今日进行减仓的股票。
+
+    # direction等于False同时今日有行情，即今日进行减仓的股票。
     # 减仓部分使用open-preclose，保留的部分使用close-preclose
-    all_tradedate_position.loc[all_tradedate_position.direction == False, "return"] = \
+    all_tradedate_position.loc[(all_tradedate_position.direction == False)&(-all_tradedate_position.closep.isnull()), "return"] = \
         (np.log(all_tradedate_position.loc[:, "closep"]) - np.log(all_tradedate_position.loc[:, "preclosep"])) \
         * (all_tradedate_position.loc[:, "weight"]) + \
         (np.log(all_tradedate_position.loc[:, "openp"]) - np.log(all_tradedate_position.loc[:, "preclosep"])) \
         * (all_tradedate_position.loc[:, "delta_weight"])
+
+    # direction等于False同时今日无行情，即今日进行踢出的股票。
+    # 踢出的部分使用openp-preclose
+    # 由于被踢出的股票，没有行情数据，表all_tradedate_position_tickout加入了踢出股票的行情数据
+    all_tradedate_position_tickout = all_tradedate_position.loc[:, ["time", "stkcd", "delta_weight"]]
+    all_tradedate_position_tickout = pd.merge(all_tradedate_position_tickout, all_trading_data, on=["time", "stkcd"])
+    # all_tradedate_position_tickout和all_tradedate_position只在行情数据上不一致
+    all_tradedate_position.loc[(all_tradedate_position.direction == False) & (all_tradedate_position.closep.isnull()), "return"] = \
+        (np.log(all_tradedate_position_tickout.loc[:, "openp"]) - np.log(all_tradedate_position_tickout.loc[:, "preclosep"])) \
+        * (all_tradedate_position_tickout.loc[:, "delta_weight"])
+
     # direction等于NA，即今日股票未交易。使用close-preclose
-    all_tradedate_position.loc[
-        (all_tradedate_position.direction != True) & (all_tradedate_position.direction != False), "return"] = \
+    all_tradedate_position.loc[-all_tradedate_position.direction.isin([True, False]), "return"] = \
         (np.log(all_tradedate_position.loc[:, "closep"]) - np.log(all_tradedate_position.loc[:, "preclosep"])) \
         * (all_tradedate_position.loc[:, "weight"])
 
@@ -104,36 +115,21 @@ def get_portfolio(all_tradedate_position, trade_detail, daily_cost, all_trading_
 
     daily_return = all_tradedate_position_summary.groupby('time').apply(sum_all).reset_index(drop=True).loc[:,
                    ["time", "value"]]
-    # 在trade_detail里的direction等于false，但股票不在对应交易日的all_tradedate_position里，即今日踢出的股票
-    # 使用open-preclose
-    # 将trade_detail和all_trading_data进行合并
-    trade_detail = pd.merge(trade_detail, all_trading_data, on=["time", "stkcd"], how="left")
-    for time, group in trade_detail.groupby("time"):
-        group = group.copy()
-        # 对应time的当日持仓表all_tradedate_position
-        time_stk_list = list(all_tradedate_position.loc[all_tradedate_position.time == time].stkcd)
-        # 关心的标的
-        ind = (group.direction == False) & (-group.stkcd.isin(time_stk_list))
-        group.loc[ind, "return"] = (np.log(group.loc[:, "openp"]) - np.log(group.loc[:, "preclosep"])) \
-                                   * (group.loc[:, "delta_weight"])
-        # 修改daily_return表即可,增加当日踢出股票带来的收益
-        daily_return.loc[daily_return.time == time, "value"] = daily_return.loc[daily_return.time == time, "value"] + \
-                                                               group.loc[ind, "return"].sum()
-
-    # # 计算得的股票在每天的收益（可能使用其他的计算方法）
-    # all_tradedate_position.loc[:, "return"] = (np.log(all_tradedate_position.loc[:, "closep"]) - np.log(
-    #     all_tradedate_position.loc[:, "preclosep"])) * all_tradedate_position.loc[:, "weight"]
-    # all_tradedate_position = all_tradedate_position.loc[:, ["time", "return"]]
-    #
-    # # 得到每日净值变化
-    #
-    # def sum_all(df):
-    #     df = df.copy()
-    #     df.loc[:, 'value'] = np.sum(df.loc[:, "return"])
-    #     return df.head(1)
-    #
-    # daily_return = all_tradedate_position.groupby('time').apply(sum_all).reset_index(drop=True).loc[:,
-    #                ["time", "value"]]
+    # # 在trade_detail里的direction等于false，但股票不在对应交易日的all_tradedate_position里，即今日踢出的股票
+    # # 使用open-preclose
+    # # 将trade_detail和all_trading_data进行合并
+    # trade_detail = pd.merge(trade_detail, all_trading_data, on=["time", "stkcd"], how="left")
+    # for time, group in trade_detail.groupby("time"):
+    #     group = group.copy()
+    #     # 对应time的当日持仓表all_tradedate_position
+    #     time_stk_list = list(all_tradedate_position.loc[all_tradedate_position.time == time].stkcd)
+    #     # 关心的标的
+    #     ind = (group.direction == False) & (-group.stkcd.isin(time_stk_list))
+    #     group.loc[ind, "return"] = (np.log(group.loc[:, "openp"]) - np.log(group.loc[:, "preclosep"])) \
+    #                                * (group.loc[:, "delta_weight"])
+    #     # 修改daily_return表即可,增加当日踢出股票带来的收益
+    #     daily_return.loc[daily_return.time == time, "value"] = daily_return.loc[daily_return.time == time, "value"] + \
+    #                                                            group.loc[ind, "return"].sum()
 
     # 对冲
     # todo:是否按照当日实际仓位对冲
@@ -150,10 +146,6 @@ def get_portfolio(all_tradedate_position, trade_detail, daily_cost, all_trading_
     return portfolio
 
 
-# def get_transaction(indicator_matrix):
-#     pass
-#
-#
 # 计算最大回撤率
 def get_maxdrawdown(portfolio):
     max_return = np.fmax.accumulate(portfolio)

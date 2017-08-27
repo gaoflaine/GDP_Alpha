@@ -183,9 +183,9 @@ def position_extension(CPD_position, all_trading_data,
         # copy数据，防止数据污染
         group = group.copy()
         for today in period:
-            if today == '2010-06-01':
-                print(1)
-                pass
+            # if today == '2011-04-01':
+            #     print(1)
+            #     pass
             today_position = pd.DataFrame(columns=['time', 'stkcd', 'weight'])  # 重置数据
             if today == name:
                 # 换仓日，仓位保持与上个月一样
