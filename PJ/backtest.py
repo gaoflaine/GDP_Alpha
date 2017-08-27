@@ -169,7 +169,7 @@ if __name__ == "__main__":
         # "path": 'F:\project_gdp\GD.db',
         "factor": ["pb"],
         # "weightType": 3,
-        "n": 300,
+        "n": 100,
         "industry_neutral": 1,
         "weightType": 1,
         "positionType": 2,
@@ -177,7 +177,7 @@ if __name__ == "__main__":
         # "weightType": 0,
         # "factor_weight": [0.5, -0.5],
         "start": "2010-01-01",
-        "end": "2012-01-01",
+        "end": "2011 -01-01",
         "backperiod": 20,
         "hedgemethod": 1
     }

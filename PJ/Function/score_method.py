@@ -54,19 +54,11 @@ def scorepercent_industry(CPD_factor, weight, CPD_inudstry_weight, CPD_stk_inuds
     def allocate_n(df):
         # copy data
         df = df.copy()
+        #循环变量准备
         result_temp = df.copy()
-        # 初始化result数据
         result = pd.DataFrame(columns=["time", "industry", "weight", "allocate_num"])
-        basic_num = n // len(df)
-        residual_num = n % len(df)
-        # 首先result中加入未达到basic_num的行业
-        result_temp.loc[result_temp["num"] <= basic_num, "allocate_num"] = result_temp["num"]
-        result = result.append(result_temp.loc[result_temp["num"] <= basic_num])
-        # 计算basic_number中未分配的数量加入residual_num
-        new_residual_num = (basic_num - result_temp.loc[result_temp["num"] <= basic_num, "allocate_num"]).sum()
-        residual_num = residual_num + new_residual_num
-        # result_temp中删去对应行业
-        result_temp = result_temp.loc[result_temp["num"] > basic_num]
+        residual_num = n
+        basic_num = 0
         while len(result_temp) != 0:
             if residual_num > len(result_temp):
                 # 修改basic_num和residual_num
@@ -91,7 +83,7 @@ def scorepercent_industry(CPD_factor, weight, CPD_inudstry_weight, CPD_stk_inuds
                     head_ones = result_temp.head(len(result_temp) - int(residual_num))
                     head_ones.loc[head_ones["num"] <= basic_num, "allocate_num"] = head_ones["num"]
                     head_ones.loc[head_ones["num"] > basic_num, "allocate_num"] = basic_num
-                    new_residual_num=(basic_num - head_ones.loc[head_ones["num"] <= basic_num, "allocate_num"]).sum()
+                    new_residual_num = (basic_num - head_ones.loc[head_ones["num"] <= basic_num, "allocate_num"]).sum()
                     residual_num = residual_num + new_residual_num
                     result = result.append(head_ones)
                     # 筛选后residual_num个行业
