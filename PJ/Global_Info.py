@@ -22,7 +22,9 @@ class Global_Info:
     backperiod = 20  # 因子权重计算过程中，使用多少过去的数据来计算调仓日的因子打分权重
     hedgemethod = 0  # 对冲的模式，0不进行对冲，1是指数简单对冲（不考虑保证金，只计算超额收益），2是使用标的的期货品种进行对冲，保证金为margin
     margin = 0.1  # 对冲标的的保证金比率
-    tradecost=0.0001 # 股票交易成本
+    tradecost = 0.0001  # 股票交易成本
+    risk_free_rate = 0.0002  # 无风险利率
+    cutoff = 0.05  # VaR的计算
 
     # score_weight
     factor_weight = {1: factor_weight.equal_weight, 2: factor_weight.pca, 3: factor_weight.regression}

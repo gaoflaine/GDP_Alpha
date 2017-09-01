@@ -23,9 +23,10 @@ def store_position(all_tradedate_position, id, para_dict):
     f.writelines(lines2)
     f.close()
 
-def store_graph(portfolio, id, para_dict):
+
+def store_graph(portfolio, id, hedgemethod):
     portfolio = portfolio.copy()
     path = './Backtest_result/Graph/' + id + '.jpg'
-    portfolio['time'] = [dt.datetime.strptime(i, '%Y-%m-%d') for i in portfolio.time]
+    portfolio['time'] = [dt.datetime.strptime(i, '%Y-%m-%d') for i in portfolio.index]
     plt.plot(portfolio.time, portfolio.value_hedged)
     plt.savefig(path)

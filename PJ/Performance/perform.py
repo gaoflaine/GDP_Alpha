@@ -2,31 +2,10 @@
 # Copyright GDP Group
 # Created by songzhichen and ruchuang gao on July 8 2017
 
-# 输入持仓表和行情表，返回每日净值
-
-# import pickle
-# import sqlite3
-# conn = sqlite3.connect('F:\project_gdp\GD.db')
 import pandas as pd
 import numpy as np
+import empyrical as em
 
-
-# 输入最终每日实际持仓表（考虑涨跌停等限制后），返回策略的净值表现
-# 增加交易成本的考虑
-# def get_portfolio(position, price):
-#     position = pd.merge(position, price, on=['time', 'stkcd'])
-#     # 得到每日的收益状况
-#     daily_return = pd.DataFrame()
-#     i = 0
-#     for name, group in position.groupby('time'):
-#         daily_return.loc[i, 'time'] = name
-#         daily_return.loc[i, 'value'] = (group.loc[:, 'weight'] * np.log(group.loc[:, 'closep'])).sum() - \
-#                                        (group.loc[:, 'weight'] * np.log(group.loc[:, 'preclosep'])).sum()
-#         i += 1
-#     # 得到净值表现
-#     portfolio = daily_return.copy()
-#     portfolio.loc[:, "value"] = (daily_return.loc[:, 'value'] + 1).cumprod()
-#     return daily_return, portfolio
 
 # 获得每日交易成本和每日股票买卖点
 def get_cost(all_tradedate_position):
@@ -82,7 +61,8 @@ def get_portfolio(all_tradedate_position, trade_detail, daily_cost, all_trading_
 
     # direction等于False同时今日有行情，即今日进行减仓的股票。
     # 减仓部分使用open-preclose，保留的部分使用close-preclose
-    all_tradedate_position.loc[(all_tradedate_position.direction == False)&(-all_tradedate_position.closep.isnull()), "return"] = \
+    all_tradedate_position.loc[
+        (all_tradedate_position.direction == False) & (-all_tradedate_position.closep.isnull()), "return"] = \
         (np.log(all_tradedate_position.loc[:, "closep"]) - np.log(all_tradedate_position.loc[:, "preclosep"])) \
         * (all_tradedate_position.loc[:, "weight"]) + \
         (np.log(all_tradedate_position.loc[:, "openp"]) - np.log(all_tradedate_position.loc[:, "preclosep"])) \
@@ -94,8 +74,10 @@ def get_portfolio(all_tradedate_position, trade_detail, daily_cost, all_trading_
     all_tradedate_position_tickout = all_tradedate_position.loc[:, ["time", "stkcd", "delta_weight"]]
     all_tradedate_position_tickout = pd.merge(all_tradedate_position_tickout, all_trading_data, on=["time", "stkcd"])
     # all_tradedate_position_tickout和all_tradedate_position只在行情数据上不一致
-    all_tradedate_position.loc[(all_tradedate_position.direction == False) & (all_tradedate_position.closep.isnull()), "return"] = \
-        (np.log(all_tradedate_position_tickout.loc[:, "openp"]) - np.log(all_tradedate_position_tickout.loc[:, "preclosep"])) \
+    all_tradedate_position.loc[
+        (all_tradedate_position.direction == False) & (all_tradedate_position.closep.isnull()), "return"] = \
+        (np.log(all_tradedate_position_tickout.loc[:, "openp"]) - np.log(
+            all_tradedate_position_tickout.loc[:, "preclosep"])) \
         * (all_tradedate_position_tickout.loc[:, "delta_weight"])
 
     # direction等于NA，即今日股票未交易。使用close-preclose
@@ -131,52 +113,101 @@ def get_portfolio(all_tradedate_position, trade_detail, daily_cost, all_trading_
     #     daily_return.loc[daily_return.time == time, "value"] = daily_return.loc[daily_return.time == time, "value"] + \
     #                                                            group.loc[ind, "return"].sum()
 
+    # 计算基准收益
+    benchmark_return = all_trading_data[all_trading_data.stkcd == benchmark]
+    benchmark_return.loc[:, 'return'] = np.log(benchmark_return.closep) - np.log(benchmark_return.preclosep)
+    benchmark_return = benchmark_return.loc[:, ["time", "return"]]
+
     # 对冲
     # todo:是否按照当日实际仓位对冲
+    if hedgemethod == 0:
+        daily_return_hedged = daily_return
+        daily_return_hedged.columns = ["time", "value_hedged"]
+        benchmark_return = benchmark_return.loc[benchmark_return.time.isin(daily_return_hedged.time), :]
+
     if hedgemethod == 1:
-        benchmark_return = all_trading_data[all_trading_data.stkcd == benchmark]
-        benchmark_return.loc[:, 'return'] = np.log(benchmark_return.closep) - np.log(benchmark_return.preclosep)
         daily_return_hedged = pd.merge(daily_return, benchmark_return, on='time')
         daily_return_hedged.loc[:, 'value_hedged'] = daily_return_hedged['value'] - daily_return_hedged['return']
         daily_return_hedged = daily_return_hedged.loc[:, ['time', 'value_hedged']]
 
-    # 得到净值表现
-    portfolio = daily_return_hedged.copy()
-    portfolio.loc[:, "value_hedged"] = np.cumprod((daily_return_hedged.loc[:, 'value_hedged'] + 1))
-    return portfolio
+    # 得到最终的daily_return表现
+    daily_return_hedged = daily_return_hedged.set_index("time")
+
+    # 得到基准的daily_return表现
+    benchmark_return = benchmark_return.set_index("time")
+
+    # 得到最终的累计净值表现
+    portfolio = em.stats.cum_returns(daily_return_hedged, 1)
+
+    return portfolio, daily_return_hedged, benchmark_return
 
 
-# 计算最大回撤率
-def get_maxdrawdown(portfolio):
-    max_return = np.fmax.accumulate(portfolio)
-    return np.nanmin((portfolio - max_return) / max_return)
+def get_indicator(daily_return_hedged, benchmark_return, risk_free_rate, hedgemethod, cutoff):
+    # 取得参数的deepcopy 防止污染参数数据 同时转化为series
+    daily_return_hedged = daily_return_hedged.value_hedged.copy()
+    benchmark_return = benchmark_return.loc[:, "return"].copy()
 
-# 输入每日交易盈亏，返回年化收益率
-def get_annual_return(portfolio):
-    return (1 + np.mean(portfolio, axis=0)) ** 250 - 1
+    # 计算组合净值表现
+    portfolio = em.stats.cum_returns(daily_return_hedged, 1)
+    # 计算组合最大回撤
+    max_drawdown = em.stats.max_drawdown(daily_return_hedged)
+    # 计算组合年化收益率
+    annual_return = em.stats.annual_return(daily_return_hedged)
+    # 计算组合年化波动率
+    annual_volatility = em.stats.annual_volatility(daily_return_hedged)
+    # 计算组合calmar比率
+    calmar_ratio = em.stats.calmar_ratio(daily_return_hedged)
+    # 计算组合omega比率
+    #
+    # 计算组合sharpe比率
+    sharpe_ratio = em.stats.sharpe_ratio(daily_return_hedged, risk_free=risk_free_rate)
+    # 计算组合sortino比率
+    #
+    # 计算组合downside_risk
+    #
+    # 计算组合tail_ratio
+    tail_ratio = em.stats.tail_ratio(daily_return_hedged)
+    # 计算组合VaR和CVaR
+    VaR = em.stats.value_at_risk(daily_return_hedged, cutoff)
+    CVaR = em.stats.conditional_value_at_risk(daily_return_hedged, cutoff)
 
-# 输入每日交易盈亏，返回年化波动率
-def get_volatility(final):
-    return np.std(final, axis=0) * np.sqrt(250)
+    # 计算组合超额sharpe比率、alpha\beta值和capture比率
+    if hedgemethod == 0:
+        # 超额夏普比率
+        excess_sharpe_ratio = em.stats.excess_sharpe(daily_return_hedged, benchmark_return)
+        # 组合alpha和beta值
+        alpha, beta = em.stats.alpha_beta(daily_return_hedged, benchmark_return, risk_free=risk_free_rate)
+        up_alpha, up_beta = em.stats.up_alpha_beta(daily_return_hedged, benchmark_return, risk_free=risk_free_rate)
+        down_alpha, down_beta = em.stats.down_alpha_beta(daily_return_hedged, benchmark_return,
+                                                         risk_free=risk_free_rate)
+        # capture
+        capture = em.stats.capture(daily_return_hedged, benchmark_return)
+        # up\down capture
+        up_capture = em.stats.up_capture(daily_return_hedged, benchmark_return)
+        down_capture = em.stats.down_capture(daily_return_hedged, benchmark_return)
 
+# # 计算最大回撤率
+# def get_maxdrawdown(portfolio):
+#     max_return = np.fmax.accumulate(portfolio)
+#     return np.nanmin((portfolio - max_return) / max_return)
+#
+# # 输入每日交易盈亏，返回年化收益率
+# def get_annual_return(portfolio):
+#     return (1 + np.mean(portfolio, axis=0)) ** 250 - 1
+#
+# # 输入每日交易盈亏，返回年化波动率
+# def get_volatility(final):
+#     return np.std(final, axis=0) * np.sqrt(250)
 
 # # 输入每日交易盈亏和无风险利率，返回夏普比率
 # def get_sharperatio(annual_return, annual_volatility, r):
 #     return (annual_return - r) / annual_volatility
-#
-#
-
-#
-#
-
-#
 #
 # # 组合beta
 # def get_alpha_beta(final, base_return):
 #     slope, intercept, r_value, p_value, slope_std_error \
 #         = stats.linregress(final, base_return)
 #     return intercept, slope
-#
 #
 # # 输入组合每日日交易盈亏和基准每日交易盈亏，返回信息比率
 # def get_IR(final, base_return):

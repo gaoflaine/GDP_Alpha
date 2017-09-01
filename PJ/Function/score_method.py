@@ -54,7 +54,7 @@ def scorepercent_industry(CPD_factor, weight, CPD_inudstry_weight, CPD_stk_inuds
     def allocate_n(df):
         # copy data
         df = df.copy()
-        #循环变量准备
+        # 循环变量准备
         result_temp = df.copy()
         result = pd.DataFrame(columns=["time", "industry", "weight", "allocate_num"])
         residual_num = n
@@ -139,4 +139,4 @@ def scorepercent_industry(CPD_factor, weight, CPD_inudstry_weight, CPD_stk_inuds
         return df
 
     CPD_position = position_temp.groupby("time").apply(weight_hundred).reset_index(drop=True)
-    return CPD_position
+    return CPD_position.loc[:, ["time", "stkcd", "weight"]]

@@ -34,6 +34,8 @@ class BackTest:
         self.hedgemethod = kwargs.get("hedgemethod", self.global_info.hedgemethod)
         self.margin = kwargs.get("margin", self.global_info.margin)
         self.tradecost = kwargs.get("tradecost", self.global_info.tradecost)
+        self.risk_free_rate = kwargs.get("risk_free_rate", self.global_info.risk_free_rate)
+        self.cutoff = kwargs.get("cutoff", self.global_info.cutoff)
 
         # 连接数据库
         self.connection = MySQLite(self.path)
@@ -152,14 +154,21 @@ class BackTest:
         self.trade_detail, self.cost = perform.get_cost(self.all_tradedate_position)
 
         # 输入每日持仓表、每日交易成本、股票具体买卖点、行情数据表、对冲方法和基准标的，返回净值表现
-        self.portfolio = perform.get_portfolio(self.all_tradedate_position, self.trade_detail, self.cost,
-                                               self.all_trading_data,
-                                               self.benchmark, self.hedgemethod, self.margin, self.tradecost)
+        self.portfolio, self.daily_return_hedged, self.benchmark_return = perform.get_portfolio(
+            self.all_tradedate_position, self.trade_detail,
+            self.cost,
+            self.all_trading_data,
+            self.benchmark, self.hedgemethod, self.margin,
+            self.tradecost)
+
+        # 组合净值表现和必要信息，返回组合的各项度量指标
+        self.indicator = perform.get_indicator(self.daily_return_hedged, self.benchmark_return, self.risk_free_rate,
+                                               self.hedgemethod, self.cutoff)
 
     # 把每日的实际持仓和净值表现写入txt，存储在Backtest_Position和Backtest_Graph文件夹里
     def output_result(self):
         output.store_position(self.all_tradedate_position, self.id, para_dict)
-        output.store_graph(self.portfolio, self.id, para_dict)
+        output.store_graph(self.portfolio, self.id, self.hedgemethod)
 
     def run(self):
         self.get_data()
@@ -172,12 +181,12 @@ class BackTest:
 
 if __name__ == "__main__":
     para_dict = {
-        # "path": 'D:\strategy\GDP\GD.db',
-        "path": 'F:\project_gdp\GD.db',
+        "path": 'D:\strategy\GDP\GD.db',
+        # "path": 'F:\project_gdp\GD.db',
         "factor": ["pb"],
         # "weightType": 3,
-        "n": 100,
-        "industry_neutral": 1,
+        "n": 10,
+        "industry_neutral": 0,
         "weightType": 1,
         "positionType": 2,
         "factor_direction": [1],

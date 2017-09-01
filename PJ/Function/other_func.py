@@ -337,7 +337,7 @@ def position_extension(CPD_position, all_trading_data,
             # 把今天赋值给昨天
             yesterday = today
             yesterday_position = today_position.copy()
-    return final_result
+    return final_result.loc[:, ["time", "stkcd", "weight"]]
 
 
 def weighttoweight(change_position_day, factor_input_weight, factor):
