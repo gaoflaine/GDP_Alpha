@@ -1,15 +1,4 @@
-hedgemethod:1 
-backperiod:20 
-end:2011 -01-01 
-start:2010-01-01 
-factor_direction:[1] 
-positionType:2 
-weightType:1 
-industry_neutral:1 
-n:100 
-factor:['pb'] 
-path:F:\project_gdp\GD.db 
-	time	stkcd	weight
+path: F:\project_gdp\GD.dbfactor: ['pb']n: 100industry_neutral: 1weightType: 1positionType: 2factor_direction: [1]start: 2010-01-01end: 2011 -01-01backperiod: 20hedgemethod: 1	time	stkcd	weight
 88	2010-01-05	000001	0.05077133372388201
 29	2010-01-05	000012	0.004393673110720559
 62	2010-01-05	000021	0.0013018290698431287
