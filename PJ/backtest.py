@@ -10,6 +10,7 @@ from Function import score_method
 from Global_Info import Global_Info
 from MySQLite.MySQLite_Manager import MySQLite
 from Performance import perform
+from Performance import output
 
 
 class BackTest:
@@ -155,18 +156,24 @@ class BackTest:
                                                self.all_trading_data,
                                                self.benchmark, self.hedgemethod, self.margin, self.tradecost)
 
+    # 把每日的实际持仓和净值表现写入txt，存储在Backtest_Position和Backtest_Graph文件夹里
+    def output_result(self):
+        output.store_position(self.all_tradedate_position, self.id, para_dict)
+        output.store_graph(self.portfolio, self.id, para_dict)
+
     def run(self):
         self.get_data()
         self.factor_weight()
         self.get_position()
         self.position_restrict()
         self.get_portfolio()
+        self.output_result()
 
 
 if __name__ == "__main__":
     para_dict = {
-        "path": 'D:\strategy\GDP\GD.db',
-        # "path": 'F:\project_gdp\GD.db',
+        # "path": 'D:\strategy\GDP\GD.db',
+        "path": 'F:\project_gdp\GD.db',
         "factor": ["pb"],
         # "weightType": 3,
         "n": 100,
